@@ -114,6 +114,10 @@ def uygulama_kontrol(getir_json=getir_json, mevcut=__version__):
     surumu = getir_json(API.format(GITHUB_REPO))
     tag = surumu["tag_name"].lstrip("vV")
     if daha_yeni(tag, mevcut):
+        for varlik in surumu.get("assets") or ():
+            ad = varlik.get("name", "")
+            if ad.startswith("ytmp3pldl-kurulum-") and ad.endswith(".exe"):
+                return tag, varlik["browser_download_url"]
         return tag, surumu["html_url"]
     return None
 

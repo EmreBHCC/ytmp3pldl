@@ -20,8 +20,10 @@ def zip_bayt():
 
 
 class SahteGitHub:
-    def __init__(self, tag=TAG, icerik=None, ozet=None, uygulama_tag="v1.0.0", hata=None):
+    def __init__(self, tag=TAG, icerik=None, ozet=None, uygulama_tag="v1.0.0", hata=None,
+                 uygulama_varliklari=()):
         self.tag, self.uygulama_tag, self.hata = tag, uygulama_tag, hata
+        self.uygulama_varliklari = list(uygulama_varliklari)
         self.icerik = zip_bayt() if icerik is None else icerik
         ozet = hashlib.sha256(self.icerik).hexdigest() if ozet is None else ozet
         self.sums = f"{ozet}  yt-dlp\n{'0' * 64}  yt-dlp.exe\n".encode()
@@ -36,7 +38,8 @@ class SahteGitHub:
                 {"name": "yt-dlp", "browser_download_url": "https://x/yt-dlp"},
                 {"name": "yt-dlp.exe", "browser_download_url": "https://x/yt-dlp.exe"},
                 {"name": "SHA2-256SUMS", "browser_download_url": "https://x/SHA2-256SUMS"}]}
-        return {"tag_name": self.uygulama_tag, "html_url": SAYFA + self.uygulama_tag}
+        return {"tag_name": self.uygulama_tag, "html_url": SAYFA + self.uygulama_tag,
+                "assets": self.uygulama_varliklari}
 
     def bayt(self, url):
         self.istekler.append(url)
@@ -138,6 +141,21 @@ def test_uygulama_yeni_surum(tmp_path):
     assert g.uygulama_kontrol(SahteGitHub(uygulama_tag="v1.2.0").json, mevcut="1.0.0") == (
         "1.2.0", SAYFA + "v1.2.0")
     assert g.uygulama_kontrol(SahteGitHub(uygulama_tag="v1.0.0").json, mevcut="1.0.0") is None
+
+
+def test_uygulama_indir_dugmesi_kurulum_exe_url_ini_verir():
+    varliklar = [
+        {"name": "Source code (zip)", "browser_download_url": SAYFA + "v1.2.0/src.zip"},
+        {"name": "ytmp3pldl-kurulum-1.2.0.exe", "browser_download_url": SAYFA + "v1.2.0/kurulum.exe"},
+    ]
+    gh = SahteGitHub(uygulama_tag="v1.2.0", uygulama_varliklari=varliklar)
+    assert g.uygulama_kontrol(gh.json, mevcut="1.0.0") == ("1.2.0", SAYFA + "v1.2.0/kurulum.exe")
+
+
+def test_uygulama_kurulum_exe_yoksa_sayfa_url_i_verir():
+    varliklar = [{"name": "Source code (zip)", "browser_download_url": SAYFA + "v1.2.0/src.zip"}]
+    gh = SahteGitHub(uygulama_tag="v1.2.0", uygulama_varliklari=varliklar)
+    assert g.uygulama_kontrol(gh.json, mevcut="1.0.0") == ("1.2.0", SAYFA + "v1.2.0")
 
 
 def test_kontrol_et_gunde_bir_kez(tmp_path):
