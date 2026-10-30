@@ -160,3 +160,16 @@ def test_kontrol_et_hash_hatasinda_sessiz(tmp_path):
     gh = SahteGitHub(ozet="0" * 64)
     assert g.kontrol_et(str(tmp_path), "2026.08.19", gh.json, gh.bayt, simdi=lambda: 1000.0) is None
     assert durum.oku(str(tmp_path))["son_kontrol"] is None
+
+
+@pytest.mark.parametrize("tag", ["../x", "", "..\\x","2026.10.26/../../x", "v2026.10.26", "abc"])
+def test_gecersiz_tag_reddedilir_ve_diske_yazilmaz(tmp_path, tag):
+    with pytest.raises(g.GuncellemeHatasi):
+        guncelle(tmp_path, SahteGitHub(tag=tag), zorla=True)
+    assert klasorler(tmp_path) == []
+    assert not (tmp_path / "durum.json").exists()
+    assert not (tmp_path.parent / "x").exists()
+
+
+def test_tag_dort_parcali_kabul_edilir(tmp_path):
+    assert guncelle(tmp_path, SahteGitHub(tag="2026.10.26.1")) == "2026.10.26.1"

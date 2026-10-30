@@ -76,6 +76,8 @@ def ytdlp_guncelle(veri_dir, mevcut, getir_json=getir_json, getir_bayt=getir_bay
     """
     surumu = getir_json(API.format(YTDLP_REPO))
     tag = surumu["tag_name"]
+    if not isinstance(tag, str) or not re.fullmatch(r"\d{4}\.\d{2}\.\d{2}(\.\d+)?", tag):
+        raise GuncellemeHatasi(f"gecersiz yt-dlp tag'i: {tag!r}")
     d = durum.oku(veri_dir)
     if tag in d["kara_liste"]:
         return None
