@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv*/
+build/
+dist/
+paketleme/indirilen/
+.pytest_cache/
+.superpowers/
