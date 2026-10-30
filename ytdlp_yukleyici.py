@@ -36,7 +36,9 @@ def _dene(yol, modul):
         sys.path.insert(0, yol)
     try:
         importlib.invalidate_caches()
-        importlib.import_module(modul)
+        paket = importlib.import_module(modul)
+        if yol is not None and not str(getattr(paket, "__file__", None) or "").startswith(yol):
+            raise ImportError(f"{modul} {yol} disinda yuklendi: {getattr(paket, '__file__', None)}")
         return importlib.import_module(modul + ".version").__version__
     except Exception:
         if yol is not None:
@@ -67,7 +69,10 @@ def yukle(veri_dir, yedek_yolu, modul="yt_dlp") -> YuklemeSonucu:
             log.warning("yt-dlp %s yuklenemedi, kara listeye: %r", surum, hata)
             python_yetersiz = python_yetersiz or _python_sebebi(hata)
             d["kara_liste"].append(surum)
-            durum.yaz(veri_dir, d)
+            try:
+                durum.yaz(veri_dir, d)
+            except OSError as yazma_hatasi:
+                log.warning("kara liste yazilamadi, bu calistirmada gecerli: %r", yazma_hatasi)
     for kaynak, yol in (("yedek", yedek_yolu), ("sistem", None)):
         if yol is not None and not os.path.isfile(yol):
             continue

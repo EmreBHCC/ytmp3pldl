@@ -102,6 +102,32 @@ def test_syntax_error_python_yetersiz_sayilir(veri, yedek):
     assert yy.yukle(str(veri), yedek, modul=MODUL).python_yetersiz is True
 
 
+def test_kara_liste_yazilamazsa_yedege_dusulur(veri, yedek, monkeypatch):
+    bozuk = Path(durum.ytdlp_dosyasi(str(veri), "2026.10.26"))
+    bozuk.parent.mkdir(parents=True)
+    bozuk.write_bytes(b"zip degil")
+    durum_yaz(veri, aktif="2026.10.26")
+
+    def yazilamaz(*_):
+        raise OSError("salt okunur disk")
+
+    monkeypatch.setattr(yy.durum, "yaz", yazilamaz)
+    assert yy.yukle(str(veri), yedek, modul=MODUL).kaynak == "yedek"
+
+
+def test_yanlis_kopya_reddedilir(veri, yedek):
+    aktif = Path(durum.ytdlp_dosyasi(str(veri), "2026.10.26"))
+    aktif.parent.mkdir(parents=True)
+    with zipfile.ZipFile(aktif, "w") as z:
+        z.writestr("baska/__init__.py", "")
+    durum_yaz(veri, aktif="2026.10.26")
+    sys.path.insert(0, yedek)  # sys.path'te baska bir kopya da varmis gibi
+    s = yy.yukle(str(veri), yedek, modul=MODUL)
+    assert s.kaynak == "yedek"
+    assert s.surum == "2026.08.19"
+    assert durum.oku(str(veri))["kara_liste"] == ["2026.10.26"]
+
+
 def test_hicbiri_yoksa_kaynak_none(veri, tmp_path):
     s = yy.yukle(str(veri), str(tmp_path / "yok" / "yt-dlp"), modul=MODUL)
     assert (s.kaynak, s.surum) == (None, None)
