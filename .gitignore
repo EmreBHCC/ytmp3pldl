@@ -6,3 +6,4 @@ dist/
 paketleme/indirilen/
 .pytest_cache/
 .superpowers/
+vendor/
