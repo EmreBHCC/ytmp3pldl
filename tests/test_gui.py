@@ -76,3 +76,24 @@ def test_indirme_hatasi_log_a_yazilir(app, monkeypatch, caplog):
     with caplog.at_level("WARNING", logger="gui"):
         app._download_worker(SahteSatir(), "mp3", "192", ".", None)
     assert any("https://example.invalid/v" in r.getMessage() and r.exc_info for r in caplog.records)
+
+
+def test_getirme_hatasi_kullaniciya_turkce(app, monkeypatch):
+    import downloader
+    monkeypatch.setattr(downloader, "fetch_entries",
+                        lambda u: (_ for _ in ()).throw(RuntimeError("getaddrinfo failed")))
+    gelen = []
+    monkeypatch.setattr(app, "_fetch_done", lambda r, e: gelen.append(e))
+    app._fetch_worker(["https://example.invalid/v"])
+    app.update()
+    assert gelen and "getaddrinfo" not in gelen[0][0]
+    assert "İnternet bağlantısı yok" in gelen[0][0]
+
+
+def test_indirme_hatasi_kullaniciya_turkce(app, monkeypatch):
+    import downloader
+    monkeypatch.setattr(downloader, "download_item",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("Private video")))
+    app._download_worker(SahteSatir(), "mp3", "192", ".", None)
+    uid, metin, _ = app.update_queue.get_nowait()
+    assert metin == "Hata: Video kaldırılmış ya da gizli."

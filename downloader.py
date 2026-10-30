@@ -118,3 +118,26 @@ def download_item(url: str, fmt: str, quality: str, output_dir: str, progress_ho
     opts = build_ydl_opts(fmt, quality, output_dir, progress_hook, subfolder)
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info(url, download=True)
+
+
+_HATA_ESLEME = (
+    (("getaddrinfo", "urlopen error", "timed out", "connection", "network is unreachable",
+      "unable to download api page"),
+     "İnternet bağlantısı yok gibi görünüyor. Bağlantıyı kontrol edip tekrar deneyin."),
+    (("private video", "video unavailable", "has been removed", "not available"),
+     "Video kaldırılmış ya da gizli."),
+    (("sign in to confirm your age", "age-restricted"),
+     "Yaş doğrulaması isteyen videolar indirilemiyor."),
+    (("is not a valid url", "unsupported url"),
+     "Bu bir YouTube linki değil gibi görünüyor."),
+)
+_HATA_DIGER = "Bu video indirilemedi. Sorun sürerse log.txt dosyasını gönderin."
+
+
+def hata_metni(e) -> str:
+    """yt-dlp hatasini kullaniciya gosterilecek Turkce, eylem soyleyen metne cevirir."""
+    ham = str(e).lower()
+    for ipuclari, metin in _HATA_ESLEME:
+        if any(i in ham for i in ipuclari):
+            return metin
+    return _HATA_DIGER

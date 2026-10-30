@@ -281,7 +281,7 @@ class App(ctk.CTk):
                 results.append((items, playlist_title))
             except Exception as e:
                 log.warning("getirme basarisiz: %s", u, exc_info=True)
-                errors.append(f"{u}\n  -> {e}")
+                errors.append(f"{u}\n  -> {downloader.hata_metni(e)}")
         self.after(0, lambda: self._fetch_done(results, errors))
 
     def _fetch_done(self, results, errors):
@@ -404,7 +404,7 @@ class App(ctk.CTk):
             else:
                 row.state = "error"
                 log.warning("indirme basarisiz: %s", row.item["url"], exc_info=True)
-                self.update_queue.put((uid, f"Hata: {e}", None))
+                self.update_queue.put((uid, f"Hata: {downloader.hata_metni(e)}", None))
         finally:
             self.update_queue.put(("__done__", uid, None))
 
