@@ -3,7 +3,8 @@ import durum
 
 def test_bos_klasor_varsayilan(tmp_path):
     assert durum.oku(str(tmp_path)) == {
-        "aktif": None, "onceki": None, "kara_liste": [], "son_kontrol": None}
+        "aktif": None, "onceki": None, "kara_liste": [], "son_kontrol": None,
+        "python_yetersiz": None, "uygulama_surum": None}
 
 
 def test_yaz_oku(tmp_path):
@@ -30,3 +31,20 @@ def test_varsayilan_liste_paylasilmaz(tmp_path):
 def test_ytdlp_dosyasi(tmp_path):
     assert durum.ytdlp_dosyasi(str(tmp_path), "2026.10.26") == str(
         tmp_path / "yt-dlp" / "2026.10.26" / "yt-dlp")
+
+
+def test_oku_tip_denetimi(tmp_path):
+    (tmp_path / "durum.json").write_text(
+        '{"kara_liste": null, "aktif": 5, "onceki": ["x"], "python_yetersiz": 3,'
+        ' "uygulama_surum": 1, "son_kontrol": "dun"}', encoding="utf-8")
+    d = durum.oku(str(tmp_path))
+    assert d == {"aktif": None, "onceki": None, "kara_liste": [], "son_kontrol": None,
+                 "python_yetersiz": None, "uygulama_surum": None}
+
+
+def test_oku_gecerli_tipler_korunur(tmp_path):
+    durum.yaz(str(tmp_path), {"aktif": "a", "kara_liste": ["k"], "son_kontrol": 12.5,
+                              "python_yetersiz": "t", "uygulama_surum": "1.0.0"})
+    d = durum.oku(str(tmp_path))
+    assert (d["aktif"], d["kara_liste"], d["son_kontrol"], d["python_yetersiz"],
+            d["uygulama_surum"]) == ("a", ["k"], 12.5, "t", "1.0.0")

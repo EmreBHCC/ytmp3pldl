@@ -62,9 +62,18 @@ def _python_sebebi(hata):
     return isinstance(hata, SyntaxError) or PYTHON_IPUCU in str(hata)
 
 
-def yukle(veri_dir, yedek_yolu, modul="yt_dlp") -> YuklemeSonucu:
+def yukle(veri_dir, yedek_yolu, modul="yt_dlp", uygulama_surum=None) -> YuklemeSonucu:
     d = durum.oku(veri_dir)
-    python_yetersiz = False
+    if uygulama_surum is not None and d["uygulama_surum"] != uygulama_surum:
+        # Yeni uygulama surumu (belki yeni Python): kara liste ve bayrak yeniden denenir.
+        d["kara_liste"] = []
+        d["python_yetersiz"] = None
+        d["uygulama_surum"] = uygulama_surum
+        try:
+            durum.yaz(veri_dir, d)
+        except OSError as yazma_hatasi:
+            log.warning("durum yazilamadi: %r", yazma_hatasi)
+    python_yetersiz = bool(d["python_yetersiz"])
     for kaynak in ("aktif", "onceki"):
         surum = d[kaynak]
         if not surum or surum in d["kara_liste"]:
@@ -76,7 +85,9 @@ def yukle(veri_dir, yedek_yolu, modul="yt_dlp") -> YuklemeSonucu:
             return YuklemeSonucu(kaynak, _dene(yol, modul), python_yetersiz)
         except Exception as hata:
             log.warning("yt-dlp %s yuklenemedi, kara listeye: %r", surum, hata)
-            python_yetersiz = python_yetersiz or _python_sebebi(hata)
+            if _python_sebebi(hata):
+                python_yetersiz = True
+                d["python_yetersiz"] = surum
             d["kara_liste"].append(surum)
             try:
                 durum.yaz(veri_dir, d)

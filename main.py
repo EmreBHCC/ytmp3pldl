@@ -99,7 +99,8 @@ def main(argv=None):
     except OSError:
         pass  # log'suz devam; uygulama yine acilir
     log.info("ytmp3pldl %s basliyor", __version__)
-    yukleme = ytdlp_yukleyici.yukle(veri_dir, yollar.yedek_ytdlp_yolu())
+    yukleme = ytdlp_yukleyici.yukle(
+        veri_dir, yollar.yedek_ytdlp_yolu(), uygulama_surum=__version__)
     log.info("yt-dlp yuklendi: %s", yukleme)
 
     if len(argv) == 2 and argv[0] == "--oz-test-yukle":

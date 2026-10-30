@@ -139,3 +139,41 @@ def test_yanlis_kopya_reddedilir(veri, yedek):
 def test_hicbiri_yoksa_kaynak_none(veri, tmp_path):
     s = yy.yukle(str(veri), str(tmp_path / "yok" / "yt-dlp"), modul=MODUL)
     assert (s.kaynak, s.surum) == (None, None)
+
+
+def yeni_surec():
+    """Her uygulama acilisi taze bir surectir: onceki yuklenen modulu unut."""
+    for ad in [m for m in sys.modules if m.startswith(MODUL)]:
+        del sys.modules[ad]
+
+
+def test_python_yetersiz_sonraki_acilista_da_doner(veri, yedek):
+    indirilmis(veri, "2027.01.01", init=PYTHON_HATASI)
+    durum_yaz(veri, aktif="2027.01.01")
+    assert yy.yukle(str(veri), yedek, modul=MODUL).python_yetersiz is True
+    yeni_surec()
+    ikinci = yy.yukle(str(veri), yedek, modul=MODUL)
+    assert (ikinci.kaynak, ikinci.python_yetersiz) == ("yedek", True)
+    assert durum.oku(str(veri))["python_yetersiz"] == "2027.01.01"
+
+
+def test_uygulama_surumu_degisince_kara_liste_ve_bayrak_temizlenir(veri, yedek):
+    indirilmis(veri, "2027.01.01", init=PYTHON_HATASI)
+    durum_yaz(veri, aktif="2027.01.01")
+    assert yy.yukle(str(veri), yedek, modul=MODUL, uygulama_surum="1.0.0").python_yetersiz is True
+    yeni_surec()
+    assert yy.yukle(str(veri), yedek, modul=MODUL, uygulama_surum="1.0.0").python_yetersiz is True
+    yeni_surec()
+    # Yeni uygulama surumu: T yeniden denenir (burada yine duser, bayrak yeniden algilanir)
+    s = yy.yukle(str(veri), yedek, modul=MODUL, uygulama_surum="1.1.0")
+    assert s.python_yetersiz is True
+    d = durum.oku(str(veri))
+    assert d["uygulama_surum"] == "1.1.0"
+    # T artik calisir hale geldiyse temizlenen kara listeden sonra yuklenir
+    indirilmis(veri, "2027.02.02")
+    durum_yaz(veri, aktif="2027.02.02", kara_liste=["2027.02.02"], python_yetersiz="2027.02.02")
+    yeni_surec()
+    s = yy.yukle(str(veri), yedek, modul=MODUL, uygulama_surum="1.2.0")
+    assert (s.kaynak, s.surum, s.python_yetersiz) == ("aktif", "2027.02.02", False)
+    d = durum.oku(str(veri))
+    assert d["kara_liste"] == [] and d["python_yetersiz"] is None
