@@ -1,0 +1,78 @@
+"""yt-dlp'yi `import yt_dlp`'den once dogru kaynaktan yukler.
+
+Sira: indirilmis aktif -> indirilmis onceki -> paketteki yedek -> sistemde kurulu.
+yt-dlp release dosyasi bir zip'tir; yolu sys.path'e konunca zipimport ile yuklenir.
+Import edilemeyen indirilmis surum kara listeye alinir ve bir daha denenmez.
+"""
+import importlib
+import logging
+import os
+import sys
+from dataclasses import dataclass
+
+import durum
+
+log = logging.getLogger(__name__)
+
+PYTHON_IPUCU = "unsupported version of Python"
+
+
+@dataclass
+class YuklemeSonucu:
+    kaynak: str | None  # aktif / onceki / yedek / sistem / None
+    surum: str | None
+    python_yetersiz: bool = False
+
+
+def _temizle(modul):
+    for ad in list(sys.modules):
+        if ad == modul or ad.startswith((modul + ".", modul + "_")):
+            del sys.modules[ad]
+
+
+def _dene(yol, modul):
+    """yol None ise sys.path'e dokunmaz. Basarida surumu dondurur, hatada temizleyip yukseltir."""
+    if yol is not None:
+        sys.path.insert(0, yol)
+    try:
+        importlib.invalidate_caches()
+        importlib.import_module(modul)
+        return importlib.import_module(modul + ".version").__version__
+    except Exception:
+        if yol is not None:
+            while yol in sys.path:
+                sys.path.remove(yol)
+            sys.path_importer_cache.pop(yol, None)
+        _temizle(modul)
+        raise
+
+
+def _python_sebebi(hata):
+    return isinstance(hata, SyntaxError) or PYTHON_IPUCU in str(hata)
+
+
+def yukle(veri_dir, yedek_yolu, modul="yt_dlp") -> YuklemeSonucu:
+    d = durum.oku(veri_dir)
+    python_yetersiz = False
+    for kaynak in ("aktif", "onceki"):
+        surum = d[kaynak]
+        if not surum or surum in d["kara_liste"]:
+            continue
+        yol = durum.ytdlp_dosyasi(veri_dir, surum)
+        if not os.path.isfile(yol):
+            continue
+        try:
+            return YuklemeSonucu(kaynak, _dene(yol, modul), python_yetersiz)
+        except Exception as hata:
+            log.warning("yt-dlp %s yuklenemedi, kara listeye: %r", surum, hata)
+            python_yetersiz = python_yetersiz or _python_sebebi(hata)
+            d["kara_liste"].append(surum)
+            durum.yaz(veri_dir, d)
+    for kaynak, yol in (("yedek", yedek_yolu), ("sistem", None)):
+        if yol is not None and not os.path.isfile(yol):
+            continue
+        try:
+            return YuklemeSonucu(kaynak, _dene(yol, modul), python_yetersiz)
+        except Exception as hata:
+            log.warning("yt-dlp (%s) yuklenemedi: %r", kaynak, hata)
+    return YuklemeSonucu(None, None, python_yetersiz)
