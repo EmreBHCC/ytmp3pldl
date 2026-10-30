@@ -1,6 +1,6 @@
 # Devam notu
 
-**2026-10-31 durum:** 7 gorev + F1-F6 + Indir dugmesi (8358d5f) bitti; `kapi.ps1` PASS (85 test, kurulum,
+**2026-10-31 durum:** 7 gorev + F1-F6 + Indir dugmesi (6febeb2) bitti; `kapi.ps1` PASS (85 test, kurulum,
 oz testler, kaldirma). main'de; public `EmreBHCC/ytmp3pldl`, release `v1.0.0` yayinda (kurulum exe sha256
 `fe922e8d25844065f4b050b64a4f951622ee578a9742525bb77178af4c2109f5`). Yeni surum: `surum.py` artir -> `kapi.ps1`
 -> tag + `gh release create` (exe adi `ytmp3pldl-kurulum-*.exe` kalmali, Indir dugmesi onu arar).
