@@ -1,71 +1,55 @@
 # ytmp3pldl — Implementasyon Kaydı
 
-> Bu dosya "ne yaptık"ı tutar. Tasarım niyeti değişirse burada güncellenir; ön-tasarım/karar
-> gerekçesi ayrı tasarım notundadır (repoda değil; henüz açılmadıysa bu
-> dosya o dosyanın da kaynağıdır).
+> "Ne yaptık"ı tutar. Tasarım ve karar gerekçesi ayrı tasarım notunda (repoda değil).
+> Uygulama planı: `docs/superpowers/plans/2026-10-30-kurulabilir-paket.md`.
 
 ## Ne bu
 
-YouTube video/playlist linklerini **MP3** veya **MP4** olarak indiren, `customtkinter` ile
-yazılmış masaüstü GUI uygulaması. Tek kullanıcılı, yerel çalışan bir araç — sunucu/backend yok.
+YouTube video/oynatma listesi linklerini **MP3** veya **MP4** olarak indiren `customtkinter`
+masaüstü uygulaması. Kullanıcıya `ytmp3pldl-kurulum-<sürüm>.exe` (Inno Setup) olarak gider;
+Python gerekmez.
 
-## Mevcut durum (2026-09-16 itibarıyla)
-
-Çalışır durumda, üretimde kullanılabilir seviyede. Dört dosyalık küçük bir kod tabanı:
+## Dosyalar
 
 ```
-main.py          # giriş noktası, App().mainloop()
-gui.py           # tüm arayüz + iş akışı orkestrasyonu (customtkinter)
-downloader.py    # yt-dlp sarmalayıcısı, GUI'den bağımsız/yeniden kullanılabilir katman
-playlist.py      # boş — kullanılmıyor, muhtemelen playlist mantığı downloader.py'a taşındı
-requirements.txt # yt-dlp, customtkinter, imageio-ffmpeg
-baslat.bat       # Windows çift-tık başlatıcı
+main.py             giriş: akışlar -> log -> yt-dlp yükleme -> (öz test | GUI + güncelleyici)
+gui.py              arayüz; yeni sürüm şeridi, alt sağda sürüm etiketi
+downloader.py       yt-dlp sarmalayıcısı (GUI'den bağımsız); Deno js_runtimes, avc1 video
+ytdlp_yukleyici.py  yt-dlp'yi aktif -> önceki -> paketteki yedek -> sistem sırasıyla import eder
+guncelleyici.py     günde bir: yt-dlp release'i SHA256 ile indir; uygulama yeni sürüm kontrolü
+durum.py            <veri>/durum.json (aktif, onceki, kara_liste, son_kontrol), atomik yazım
+yollar.py           veri klasörü, paket klasörü (_MEIPASS), vendor yolları
+surum.py            __version__, GITHUB_REPO, YTDLP_REPO (tek kaynak)
+paketleme/          hazirla.ps1, ytmp3pldl.spec, ytmp3pldl.iss, derle.ps1, kapi.ps1 (dondurulmuş)
+tests/              pytest, ağsız
 ```
 
-## Mimari
+## Çalışma zamanı
 
-**İki katman, net ayrım:**
-- `downloader.py`: yt-dlp etrafında ince bir sarmalayıcı. `fetch_entries(url)` bir video/playlist
-  linkini video listesine çözer (metadata-only, indirme yok). `download_item(...)` tek bir
-  videoyu indirir, ilerleme callback'i (`progress_hook`) alır. GUI'ye hiç bağımlı değil —
-  CLI'dan da kullanılabilir.
-- `gui.py`: `customtkinter` tabanlı pencere. `App` ana sınıf, `VideoRow` her video satırının
-  state makinesi (`waiting → downloading → done/error/cancelled`).
+- **Veri klasörü** `%LOCALAPPDATA%\ytmp3pldl\` (testte `YTMP3PLDL_VERI`): `yt-dlp\<sürüm>\yt-dlp`,
+  `durum.json`, `log.txt` (1 MB, 2 yedek).
+- **yt-dlp yükleme:** yt-dlp release dosyası bir zip; yolu `sys.path`'e konup zipimport ile
+  yüklenir. PyInstaller'ın gömülü yükleyicisi `sys.path`'ten önce geldiği için `yt_dlp` ve
+  `yt_dlp_ejs` spec'te `a.pure`'dan çıkarılır (analiz edilir ki bağımlılıkları paketlensin).
+  İmport edilemeyen indirilmiş sürüm kara listeye girer; sebep Python sürümüyse GUI
+  "uygulamanın yeni sürümü gerekiyor" şeridini gösterir.
+- **Güncelleme:** `guncelleyici.arka_planda_calistir` daemon thread'i. yt-dlp'nin son release'i
+  `SHA2-256SUMS` ile doğrulanır, `.tmp` → zip kontrolü → `os.replace`; bir sonraki açılışta aktif.
+  En çok aktif + önceki (+ o an çalışan) tutulur. `son_kontrol` yalnız başarılı yt-dlp
+  kontrolünde yazılır. Uygulamanın kendi release'i daha yeniyse şerit; exe kendini değiştirmez.
+- **Deno** `vendor/deno.exe` (v2.9.8, sabit) `js_runtimes` ile verilir; varsayılan YouTube
+  istemcileri JS çözümü ister. Eski `player_client: android` zorlaması yalnız format 18
+  (~96 kbps) getiriyordu, kaldırıldı.
+- **Öz test bayrakları** (kapı için, GUI açmaz): `--oz-test-yukle <json>`, `--oz-test <json>`.
 
-**Eşzamanlılık modeli:**
-- Fetch (metadata çözme) ayrı bir thread'de yapılır, sonuç `self.after(0, ...)` ile ana thread'e
-  postalanır (tkinter thread-safe değil, bu yüzden UI güncellemeleri hep ana thread'den).
-- İndirmeler `ThreadPoolExecutor(max_workers=3)` ile paralel — aynı anda en fazla 3 indirme.
-- İlerleme bildirimleri `queue.Queue` üzerinden akar; `_drain_queue` her 100ms'de kuyruğu boşaltıp
-  UI'yi günceller (worker thread'lerden doğrudan widget güncellemesi yapılmıyor — doğru desen).
-- İptal, `threading.Event` (`cancel_event`) ile kooperatif: yt-dlp'nin progress_hook'u içinde
-  event set edilmişse exception fırlatılıp indirme durur.
+## Derleme ve kapı
 
-**ffmpeg bağımlılığı:** `imageio-ffmpeg` paketiyle geliyor, kullanıcı ayrıca kurmuyor. `downloader.py`
-başında `FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()` ile çözülüyor.
+`pwsh -File paketleme\derle.ps1`: `.venv-build` (python.org 3.13 varsa o, yoksa `py -3.13`) →
+`requirements-dev.txt` → `hazirla.ps1` (son yt-dlp + SUMS doğrulaması, Deno sha256) →
+PyInstaller onedir (`console=False`) → `ISCC /DSurum=`. Bitti kapısı `paketleme\kapi.ps1`.
 
-**Format/kalite eşlemesi:** MP3 için `bestaudio/best` + `FFmpegExtractAudio` postprocessor
-(128/192/256/320 kbps). MP4 için `bestvideo[ext=mp4]+bestaudio[ext=m4a]` merge, çözünürlük üst
-sınırı ile (`height<=quality`).
+## Açık / sonra
 
-## Bilinen sınırlama
-
-YouTube, 2026 Temmuz'dan beri yüksek çözünürlüklü (720p/1080p) video akışlarını yalnızca
-"doğrulanmış" (PO token) isteklere açıyor. Bu uygulama PO token doğrulaması yapmıyor, dolayısıyla
-bazı videolar MP4'te yalnızca 360p olarak inebiliyor. **Bu bir bug değil, YouTube tarafı kısıtlama.**
-MP3/ses bu kısıtlamadan etkilenmiyor. README'de belgelendi (`README.md` "Bilinen sınırlama" bölümü).
-
-`playlist.py` boş dosya — silinmemiş ama kullanılmıyor. Muhtemelen erken taslak, `downloader.py`
-içindeki `fetch_entries` playlist algılamasını da üstlendi.
-
-## Geliştirmeye devam ederken
-
-- **PO token / yüksek çözünürlük:** yt-dlp'nin PO token eklentileri (`bgutil-ytdlp-pot-provider`
-  gibi) araştırılabilir; şu an bilinçli olarak es geçildi (karmaşıklık/bakım maliyeti).
-- **`playlist.py`** temizlenebilir ya da gerçekten ayrı bir sorumluluk (örn. playlist-özel
-  ayarlar: "her playlist kendi klasörüne" davranışını buraya taşımak) verilip doldurulabilir.
-- **Paralellik sabiti** (`max_workers=3`) hardcoded — GUI'den ayarlanabilir kılmak küçük bir iş.
-- **Test yok.** Küçük ve tek-kullanıcılı bir araç olduğu için şimdilik bilinçli tercih; genişlerse
-  en azından `downloader.py` (GUI'siz katman) için birim test eklemek ucuz olur.
-- Paketleme/dağıtım (`.exe`'ye derleme, PyInstaller vb.) hiç ele alınmadı — şu an yalnızca
-  `python main.py` ile yerel çalıştırma var.
+- Kod imzalama yok: SmartScreen uyarısı ilk kurulumda beklenir.
+- Paralellik sabiti (`max_workers=3`) GUI'den ayarlanamıyor.
+- Deno kendini güncellemiyor (v1 kapsamı dışı).
