@@ -40,7 +40,9 @@ def log_kur(veri_dir):
     isleyici = RotatingFileHandler(os.path.join(veri_dir, "log.txt"), maxBytes=1_000_000,
                                    backupCount=2, encoding="utf-8")
     isleyici.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
-    logging.basicConfig(level=logging.INFO, handlers=[isleyici])
+    kok = logging.getLogger()
+    kok.setLevel(logging.INFO)
+    kok.addHandler(isleyici)
 
 
 def json_yaz(yol, veri):

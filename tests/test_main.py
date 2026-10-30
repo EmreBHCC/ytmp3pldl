@@ -3,7 +3,22 @@ import os
 import subprocess
 import sys
 
+import pytest
+
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+@pytest.fixture(autouse=True)
+def log_isleyicilerini_kapat():
+    """main() process icinde log_kur'u cagirir; actigi dosyayi test sonunda kapat."""
+    import logging
+    once = list(logging.getLogger().handlers)
+    yield
+    kok = logging.getLogger()
+    for h in list(kok.handlers):
+        if h not in once:
+            kok.removeHandler(h)
+            h.close()
 
 
 def test_oz_test_yukle_bos_veri(tmp_path):
