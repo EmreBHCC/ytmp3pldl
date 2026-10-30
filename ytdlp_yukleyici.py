@@ -30,6 +30,15 @@ def _temizle(modul):
             del sys.modules[ad]
 
 
+def _yol_altinda(dosya, yol):
+    """dosya yol'un kendisi ya da altindaysa True. Windows'ta / ve \\ farkini ve harf durumunu yok sayar."""
+    if not dosya:
+        return False
+    n_dosya = os.path.normcase(os.path.abspath(dosya))
+    n_yol = os.path.normcase(os.path.abspath(yol))
+    return n_dosya == n_yol or n_dosya.startswith(n_yol + os.sep)
+
+
 def _dene(yol, modul):
     """yol None ise sys.path'e dokunmaz. Basarida surumu dondurur, hatada temizleyip yukseltir."""
     if yol is not None:
@@ -37,7 +46,7 @@ def _dene(yol, modul):
     try:
         importlib.invalidate_caches()
         paket = importlib.import_module(modul)
-        if yol is not None and not str(getattr(paket, "__file__", None) or "").startswith(yol):
+        if yol is not None and not _yol_altinda(getattr(paket, "__file__", None), yol):
             raise ImportError(f"{modul} {yol} disinda yuklendi: {getattr(paket, '__file__', None)}")
         return importlib.import_module(modul + ".version").__version__
     except Exception:

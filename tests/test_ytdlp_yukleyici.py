@@ -63,6 +63,14 @@ def test_aktif_once_gelir(veri, yedek):
     assert "2026.10.26" in sys.modules[MODUL].__file__
 
 
+def test_yol_ileri_egik_cizgiyle_verilse_de_aktif_kabul_edilir(veri, yedek):
+    indirilmis(veri, "2026.10.26")
+    durum_yaz(veri, aktif="2026.10.26")
+    s = yy.yukle(str(veri).replace("\\", "/"), yedek, modul=MODUL)
+    assert (s.kaynak, s.surum) == ("aktif", "2026.10.26")
+    assert durum.oku(str(veri))["kara_liste"] == []
+
+
 def test_bozuk_aktif_oncekine_duser_ve_kara_listeye_girer(veri, yedek):
     bozuk = Path(durum.ytdlp_dosyasi(str(veri), "2026.10.26"))
     bozuk.parent.mkdir(parents=True)
