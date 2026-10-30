@@ -3,12 +3,16 @@ import os
 import threading
 import queue
 import itertools
+import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
 import downloader
+from surum import GITHUB_REPO, __version__
+
+SURUMLER_URL = f"https://github.com/{GITHUB_REPO}/releases/latest"
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
@@ -97,12 +101,13 @@ class VideoRow(ctk.CTkFrame):
 
 
 class App(ctk.CTk):
-    def __init__(self):
+    def __init__(self, ytdlp_surum=None, python_yetersiz=False):
         super().__init__()
         self.title("YouTube İndirici")
         self.geometry("1000x700")
         self.minsize(860, 560)
 
+        self.ytdlp_surum = ytdlp_surum
         self.rows_by_uid = {}
         self.update_queue = queue.Queue()
         self.executor = None
@@ -112,6 +117,9 @@ class App(ctk.CTk):
         self.default_output = os.path.join(os.path.expanduser("~"), "Downloads", "YouTube Indirilenler")
 
         self._build_ui()
+        if python_yetersiz:
+            self._banner_ac("YouTube'daki değişikliklere uymak için uygulamanın yeni sürümü gerekiyor.",
+                            "İndir", lambda: webbrowser.open(SURUMLER_URL))
         self.after(100, self._drain_queue)
 
     # ---------------------------------------------------------- UI build --
@@ -130,6 +138,14 @@ class App(ctk.CTk):
                                                     command=self._on_theme_change, width=180)
         self.theme_switch.set("Sistem")
         self.theme_switch.grid(row=0, column=1, sticky="e")
+
+        # Gizli bilgi seridi: yeni surum / uygulama guncellemesi gerekiyor
+        self.banner = ctk.CTkFrame(top_bar, fg_color=("#fff4ce", "#4a3f12"), corner_radius=8)
+        self.banner.grid_columnconfigure(0, weight=1)
+        self.banner_label = ctk.CTkLabel(self.banner, text="", anchor="w", justify="left")
+        self.banner_label.grid(row=0, column=0, sticky="ew", padx=12, pady=8)
+        self.banner_btn = ctk.CTkButton(self.banner, text="", width=90)
+        self.banner_btn.grid(row=0, column=1, padx=(0, 12), pady=8)
 
         ctk.CTkLabel(self, text="Video veya oynatma listesi linkini yapıştırın; birden fazla linki alt alta ekleyebilirsiniz.",
                      text_color=("gray30", "gray70")).grid(row=1, column=0, sticky="w", padx=24, pady=(4, 12))
@@ -219,9 +235,24 @@ class App(ctk.CTk):
                                            state="disabled", command=self.start_download)
         self.download_btn.grid(row=0, column=3)
 
-        ctk.CTkLabel(self, text="Yalnızca indirme izniniz olan veya telif hakkı size ait içerikleri indirin.",
-                     text_color=("gray45", "gray55"), font=ctk.CTkFont(size=10)).grid(
-            row=7, column=0, sticky="w", padx=26, pady=(0, 10))
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.grid(row=7, column=0, sticky="ew", padx=26, pady=(0, 10))
+        footer.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(footer, text="Yalnızca indirme izniniz olan veya telif hakkı size ait içerikleri indirin.",
+                     text_color=("gray45", "gray55"), font=ctk.CTkFont(size=10)).grid(row=0, column=0, sticky="w")
+        self.surum_label = ctk.CTkLabel(footer, text=f"v{__version__} · yt-dlp {self.ytdlp_surum or '?'}",
+                                         text_color=("gray45", "gray55"), font=ctk.CTkFont(size=10))
+        self.surum_label.grid(row=0, column=1, sticky="e")
+
+    # ----------------------------------------------------------- banner --
+    def _banner_ac(self, metin, buton, komut):
+        self.banner_label.configure(text=metin)
+        self.banner_btn.configure(text=buton, command=komut)
+        self.banner.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+
+    def yeni_surum_goster(self, surum, url):
+        self._banner_ac(f"Yeni sürüm var ({surum}). İndirip kurmanız yeterli.", "İndir",
+                        lambda: webbrowser.open(url))
 
     # ------------------------------------------------------------ theme --
     def _on_theme_change(self, value):
