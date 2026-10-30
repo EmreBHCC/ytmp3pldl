@@ -12,6 +12,7 @@ import logging
 import os
 import sys
 import tempfile
+import threading
 import traceback
 from dataclasses import asdict
 from logging.handlers import RotatingFileHandler
@@ -23,6 +24,8 @@ from surum import __version__
 OZ_TEST_URL = "https://www.youtube.com/watch?v=jNQXAC9IVRw"
 
 log = logging.getLogger("main")
+
+_veri_dir = None  # calistir() cokme mesajinda log yolunu gostermek icin
 
 
 def akislari_duzelt():
@@ -73,11 +76,28 @@ def hata_goster(metin):
     kok.destroy()
 
 
+def _veri_klasoru_guvenli():
+    """Veri klasoru olusturulamazsa gecici klasore duser; uygulama her kosulda acilir."""
+    global _veri_dir
+    try:
+        _veri_dir = yollar.veri_klasoru()
+    except OSError:
+        _veri_dir = os.path.join(tempfile.gettempdir(), "ytmp3pldl")
+        try:
+            os.makedirs(_veri_dir, exist_ok=True)
+        except OSError:
+            pass
+    return _veri_dir
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     akislari_duzelt()
-    veri_dir = yollar.veri_klasoru()
-    log_kur(veri_dir)
+    veri_dir = _veri_klasoru_guvenli()
+    try:
+        log_kur(veri_dir)
+    except OSError:
+        pass  # log'suz devam; uygulama yine acilir
     log.info("ytmp3pldl %s basliyor", __version__)
     yukleme = ytdlp_yukleyici.yukle(veri_dir, yollar.yedek_ytdlp_yolu())
     log.info("yt-dlp yuklendi: %s", yukleme)
@@ -99,11 +119,35 @@ def main(argv=None):
     from gui import App
 
     app = App(ytdlp_surum=yukleme.surum, python_yetersiz=yukleme.python_yetersiz)
+    app.report_callback_exception = lambda tur, deger, iz: log.error(
+        "Tk callback hatasi", exc_info=(tur, deger, iz))
+    threading.excepthook = lambda a: log.error(
+        "thread hatasi: %s", a.thread.name if a.thread else "?",
+        exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
     guncelleyici.arka_planda_calistir(
         veri_dir, yukleme.surum, lambda s, u: app.after(0, app.yeni_surum_goster, s, u))
     app.mainloop()
     return 0
 
 
+def calistir(argv=None):
+    """main'i sarar: yakalanmayan hata log'a yazilir, Turkce diyalog gosterilir, cikis kodu 1."""
+    try:
+        return main(argv)
+    except Exception:
+        try:
+            log.exception("uygulama acilamadi")
+        except Exception:
+            pass
+        log_yolu = os.path.join(_veri_dir or os.path.join(tempfile.gettempdir(), "ytmp3pldl"),
+                                "log.txt")
+        try:
+            hata_goster("Uygulama açılamadı.\n\nUygulamayı yeniden kurun. Sorun sürerse şu "
+                        f"dosyayı gönderin:\n{log_yolu}")
+        except Exception:
+            pass
+        return 1
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(calistir())
