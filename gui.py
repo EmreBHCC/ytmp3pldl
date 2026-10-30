@@ -1,4 +1,5 @@
 """Modern, sade bir YouTube indirici arayuzu (customtkinter)."""
+import logging
 import os
 import threading
 import queue
@@ -12,7 +13,9 @@ import customtkinter as ctk
 import downloader
 from surum import GITHUB_REPO, __version__
 
-SURUMLER_URL = f"https://github.com/{GITHUB_REPO}/releases/latest"
+log = logging.getLogger("gui")
+
+SURUMLER_URL =f"https://github.com/{GITHUB_REPO}/releases/latest"
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
@@ -277,6 +280,7 @@ class App(ctk.CTk):
                 items, playlist_title = downloader.fetch_entries(u)
                 results.append((items, playlist_title))
             except Exception as e:
+                log.warning("getirme basarisiz: %s", u, exc_info=True)
                 errors.append(f"{u}\n  -> {e}")
         self.after(0, lambda: self._fetch_done(results, errors))
 
@@ -399,6 +403,7 @@ class App(ctk.CTk):
                 self.update_queue.put((uid, "İptal edildi", None))
             else:
                 row.state = "error"
+                log.warning("indirme basarisiz: %s", row.item["url"], exc_info=True)
                 self.update_queue.put((uid, f"Hata: {e}", None))
         finally:
             self.update_queue.put(("__done__", uid, None))
