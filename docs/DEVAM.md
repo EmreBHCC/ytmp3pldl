@@ -1,4 +1,11 @@
-# Devam notu (2026-10-30, plan yazilmadan durduruldu)
+# Devam notu
+
+**2026-10-31 durum:** 7 gorev + F1-F6 + Indir dugmesi (8358d5f) bitti; `kapi.ps1` PASS (85 test, kurulum,
+oz testler, kaldirma). Dal `kurulabilir-paket`, main'e alinmadi. **Siradaki (Emre onayi):** dali main'e al,
+repo public `EmreBHCC/ytmp3pldl`, `v1.0.0` release'e `dist/ytmp3pldl-kurulum-1.0.0.exe` yukle.
+Elle bakilacak: Deno/ffmpeg alt sureci pencere modunda konsol acıyor mu. Asagisi tarihce.
+
+# Tarihce: 2026-10-30 (plan yazilmadan durduruldu)
 
 Tasarim: ayri tasarim notunda (onayli, repoda degil). Bitti kapisi: `paketleme/kapi.ps1`
 (donduruldu, degistirilmez). Inno Setup 6.7.3 kurulu: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`.
