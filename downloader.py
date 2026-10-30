@@ -1,8 +1,13 @@
-"""yt-dlp tabanli indirme mantigi. GUI'den bagimsiz, tekrar kullanilabilir katman."""
+"""yt-dlp tabanli indirme mantigi. GUI'den bagimsiz, tekrar kullanilabilir katman.
+
+yt_dlp bu modul import edilmeden once ytdlp_yukleyici ile yuklenmis olmalidir.
+"""
 import os
 import re
 import yt_dlp
 import imageio_ffmpeg
+
+import yollar
 
 FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
@@ -13,16 +18,23 @@ def sanitize_filename(name: str) -> str:
     return INVALID_CHARS.sub("_", name).strip()
 
 
+def _temel_ayarlar():
+    """YouTube'un varsayilan istemcileri JS cozumu ister; Deno varsa yt-dlp'ye verilir."""
+    opts = {"quiet": True, "no_warnings": True}
+    deno = yollar.deno_yolu()
+    if deno:
+        opts["js_runtimes"] = {"deno": {"path": deno}}
+    return opts
+
+
 def fetch_entries(url: str):
     """Verilen URL bir video ise tek elemanli, playlist ise tum elemanlarin
     listesini dondurur. Donen deger: (items, playlist_title_or_None)."""
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
+        **_temel_ayarlar(),
         "extract_flat": "in_playlist",
         "skip_download": True,
         "ignoreerrors": True,
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -59,21 +71,29 @@ def fetch_entries(url: str):
     return items, playlist_title
 
 
+def video_formati(quality: str) -> str:
+    """H.264 (avc1) once: AV1/VP9 eski oynaticilarda acilmaz."""
+    sinir = "" if quality == "best" else f"[height<={quality}]"
+    return (
+        f"bestvideo[vcodec^=avc1]{sinir}+bestaudio[ext=m4a]/"
+        f"bestvideo[ext=mp4]{sinir}+bestaudio[ext=m4a]/"
+        f"best[ext=mp4]{sinir}/best"
+    )
+
+
 def build_ydl_opts(fmt: str, quality: str, output_dir: str, progress_hook, subfolder: str | None = None):
     target_dir = os.path.join(output_dir, sanitize_filename(subfolder)) if subfolder else output_dir
     os.makedirs(target_dir, exist_ok=True)
     outtmpl = os.path.join(target_dir, "%(title)s.%(ext)s")
 
     opts = {
+        **_temel_ayarlar(),
         "outtmpl": outtmpl,
         "ffmpeg_location": FFMPEG_PATH,
         "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
         "progress_hooks": [progress_hook],
         "ignoreerrors": False,
         "restrictfilenames": False,
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
         "retries": 15,
         "fragment_retries": 15,
         "socket_timeout": 30,
@@ -87,19 +107,14 @@ def build_ydl_opts(fmt: str, quality: str, output_dir: str, progress_hook, subfo
             "preferredquality": quality,
         }]
     else:
-        if quality == "best":
-            opts["format"] = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-        else:
-            opts["format"] = (
-                f"bestvideo[ext=mp4][height<={quality}]+bestaudio[ext=m4a]/"
-                f"best[ext=mp4][height<={quality}]/best"
-            )
+        opts["format"] = video_formati(quality)
         opts["merge_output_format"] = "mp4"
 
     return opts
 
 
 def download_item(url: str, fmt: str, quality: str, output_dir: str, progress_hook, subfolder: str | None = None):
+    """Indirir ve yt-dlp info sozlugunu dondurur (format_id: kullanilan kaynak formatlar)."""
     opts = build_ydl_opts(fmt, quality, output_dir, progress_hook, subfolder)
     with yt_dlp.YoutubeDL(opts) as ydl:
-        ydl.download([url])
+        return ydl.extract_info(url, download=True)
