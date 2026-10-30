@@ -433,6 +433,9 @@ class App(ctk.CTk):
         try:
             while True:
                 entry = self.update_queue.get_nowait()
+                if entry[0] == "__surum__":
+                    self.yeni_surum_goster(entry[1], entry[2])
+                    continue
                 if entry[0] == "__done__":
                     _, _uid, _ = entry
                     self.done_count += 1

@@ -97,3 +97,10 @@ def test_indirme_hatasi_kullaniciya_turkce(app, monkeypatch):
     app._download_worker(SahteSatir(), "mp3", "192", ".", None)
     uid, metin, _ = app.update_queue.get_nowait()
     assert metin == "Hata: Video kaldırılmış ya da gizli."
+
+
+def test_kuyruktan_yeni_surum_seridi(app):
+    app.update_queue.put(("__surum__", "1.2.0", "https://example.invalid/r"))
+    app._drain_queue()
+    assert app.banner.winfo_manager() == "grid"
+    assert "1.2.0" in app.banner_label.cget("text")

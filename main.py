@@ -125,8 +125,9 @@ def main(argv=None):
     threading.excepthook = lambda a: log.error(
         "thread hatasi: %s", a.thread.name if a.thread else "?",
         exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
-    guncelleyici.arka_planda_calistir(
-        veri_dir, yukleme.surum, lambda s, u: app.after(0, app.yeni_surum_goster, s, u))
+    # Thread mainloop basladiktan sonra acilir; Tcl'e yalniz kuyruk uzerinden dokunur.
+    app.after(0, lambda: guncelleyici.arka_planda_calistir(
+        veri_dir, yukleme.surum, lambda s, u: app.update_queue.put(("__surum__", s, u))))
     app.mainloop()
     return 0
 
